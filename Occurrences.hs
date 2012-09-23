@@ -40,14 +40,12 @@ extendCounts c f = count . f $ ConsCounts c 0
 funOccurrences :: EmptyCounts aenv => OpenFun env aenv t -> Counts aenv -> Counts aenv
 funOccurrences (Lam f)  c = funOccurrences f c
 funOccurrences (Body b) c = expOccurences b c
-funOccurrences _ = error "Constructor not handled"
 
 
 expOccurences :: EmptyCounts aenv => OpenExp env aenv t -> Counts aenv ->  Counts aenv
 expOccurences (Var x)   c = c
 expOccurences (Let l x) c = expOccurences x c
 expOccurences (Shape s) c = occurrences' s c
-expOccurences _ = error "Constructor not handled"
 
 occurrences :: forall aenv arrs. EmptyCounts aenv => OpenAcc aenv arrs -> Counts aenv
 occurrences ast = occurrences' ast fresh
@@ -64,7 +62,6 @@ occurrences' (OpenAcc ast) counts =
                 (Generate e f) -> funOccurrences f $ expOccurences e counts
                 (Use a) -> counts
                 (ZipWith f x y) -> occurrences' x $ occurrences' y counts
-occurrences _ _ = error "Should not occur"
 
       
              
