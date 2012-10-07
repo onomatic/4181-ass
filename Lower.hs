@@ -75,7 +75,7 @@ subst :: SubstEnv envInner envOuter envFinal
 subst envRel idx e (Var x) = case (substVar envRel idx e x) of 
                                     Left x' -> Var x'
                                     Right e' -> e'
-subst envRel idx e (Let e' exp) =  error "not yet implemented" -- Let e' $ subst (Keep envRel) (shiftIdx Shift idx) (shiftExpEnv e) exp
+subst envRel idx e (Let e' exp) =  Let (subst envRel idx e e') $ subst (Keep envRel) (shiftIdx Shift idx) e exp
 subst envRel idx e (Const t) = (Const t)
 subst envRel idx e (Tuple t') = Tuple $ substTuple envRel idx e t'
 subst envRel idx e (Prj t e') = Prj t $ subst envRel idx e e'
