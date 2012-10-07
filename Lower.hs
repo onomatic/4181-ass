@@ -72,7 +72,23 @@ subst :: SubstEnv envInner envOuter envFinal
       -> PreOpenExp OpenAcc envOuter aenv t
       -> PreOpenExp OpenAcc envInner aenv t'
       -> PreOpenExp OpenAcc envFinal aenv t'
-subst = error "Implement this!"
+subst envRel idx e (Var x) = case (substVar envRel idx e x) of 
+                                    Left x' -> Var x'
+                                    Right e' -> e'
+subst envRel idx e (Let e' exp) =  error "not yet implemented" -- Let e' $ subst (Keep envRel) (shiftIdx Shift idx) (shiftExpEnv e) exp
+subst envRel idx e (Const t) = (Const t)
+subst envRel idx e (Tuple t') = Tuple $ substTuple envRel idx e t'
+subst envRel idx e (Prj t e') = Prj t $ subst envRel idx e e'
+subst envRel idx e IndexNil = IndexNil
+subst envRel idx e (IndexCons e' sl) = IndexCons (subst envRel idx e e') (subst envRel idx e sl)      
+subst envRel idx e (IndexHead e') = IndexHead $ subst envRel idx e e'
+subst envRel idx e IndexAny = IndexAny
+subst envRel idx e (Cond cnd thn els) = Cond (subst envRel idx e cnd) (subst envRel idx e thn) (subst envRel idx e els)
+subst envRel idx e (PrimConst c) = PrimConst c
+subst envRel idx e (PrimApp f x) = PrimApp f $ (subst envRel idx e x)
+subst envRel idx e (ShapeSize s) = ShapeSize $ (subst envRel idx e s)   
+
+
 -- HINT: To simplify matters, you do not need to implement this function for the
 --       AST constructors 'IndexScalar' and 'Shape' (these are the only constructors
 --       embedding arrays).
