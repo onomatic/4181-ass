@@ -123,7 +123,25 @@ substVar :: SubstEnv envInner envOuter envFinal
          -> PreOpenExp OpenAcc envOuter aenv t
          -> Idx envInner t'
          -> Either (Idx envFinal t') (PreOpenExp OpenAcc envFinal aenv t')
-substVar = error "Implement this!"
+--substVar = error "Implement this!"
+substVar Subst ZeroIdx e ZeroIdx = Right e
+substVar (Keep _) _ e ZeroIdx = Left ZeroIdx
+--substVar (Keep _) idx e idxT = 
+substVar (Keep envRel) idx e (SuccIdx idxT') = Left idxT'
+substVar Subst idx e idxT = if (sameEnv idx idxT) 
+    		then undefined --right
+			else undefined --left
+
+
+--this is for the environments
+sameEnv :: Idx env t -> Idx env' t' -> Bool
+
+sameEnv ZeroIdx ZeroIdx = True
+sameEnv ZeroIdx _ = False
+sameEnv _ ZeroIdx = False
+sameEnv (SuccIdx idx) (SuccIdx idx') = sameEnv idx idx
+
+
 
 -- Environment shifting
 --
