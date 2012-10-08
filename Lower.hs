@@ -17,17 +17,17 @@ map_lowered
 map_lowered f arr
   = generate (shape arr) (\ix -> f (arr!ix))
 
-app_fun :: OpenFun (env,t) aenv t' -> PreOpenExp OpenAcc envOuter aenv t -> PreOpenExp OpenAcc envFinal aenv t'
-app_fun (Body b) e = subst undefined ZeroIdx e b
+app_fun :: PreOpenFun OpenAcc ((),t) aenv t' -> PreOpenExp OpenAcc env' aenv t -> PreOpenExp OpenAcc env' aenv t'
+app_fun (Body b) e = subst Subst ZeroIdx e b
 
-app_fun' :: OpenFun env aenv (a -> t) -> PreOpenExp OpenAcc envOuter aenv a -> PreOpenExp OpenAcc envFinal aenv t
+app_fun' :: PreFun OpenAcc aenv (a -> t) -> PreOpenExp OpenAcc envFinal aenv a -> PreOpenExp OpenAcc envFinal aenv t
 app_fun' (Lam f) e = app_fun f e
 
--- Lower 'map' into 'generate' as a AST rewrite. The array gets duplicated.
---
+--Lower 'map' into 'generate' as a AST rewrite. The array gets duplicated.
+--(IndexScalar arr (Var ZeroIdx)
 lower_map1 :: OpenAcc aenv arrs -> OpenAcc aenv arrs
 lower_map1 (OpenAcc (Map f arr)) 
- = OpenAcc $ Generate (Shape arr) (Lam $ Body $ app_fun' f (IndexScalar arr (Var ZeroIdx)) )
+ = OpenAcc $ Generate (Shape arr) (Lam $ Body $ app_fun' f (IndexScalar arr (Var ZeroIdx) ) )
 
 
 -- Lower 'map' into 'generate' as a AST rewrite. The array is being shared.
@@ -131,23 +131,29 @@ substVar :: SubstEnv envInner envOuter envFinal
          -> PreOpenExp OpenAcc envOuter aenv t
          -> Idx envInner t'
          -> Either (Idx envFinal t') (PreOpenExp OpenAcc envFinal aenv t')
---substVar = error "Implement this!"
-substVar Subst ZeroIdx e ZeroIdx = Right e
-substVar (Keep _) _ e ZeroIdx = Left ZeroIdx
---substVar (Keep _) idx e idxT = 
-substVar (Keep envRel) idx e (SuccIdx idxT') = Left idxT'
-substVar Subst idx e idxT = if (sameEnv idx idxT) 
-    		then undefined --right
-			else undefined --left
+substVar envRel idx e idxT
+         | AST.idxToInt idx == AST.idxToInt idxT = Right $ subst envRel idx e undefined
+         | otherwise = case envRel of 
+                       (Keep r) -> Left $ shiftFun envRel $ (shiftIdx (shiftOuter envRel) idxT )
 
 
---this is for the environments
-sameEnv :: Idx env t -> Idx env' t' -> Bool
 
-sameEnv _ ZeroIdx = False
-sameEnv ZeroIdx _ = False
-sameEnv ZeroIdx ZeroIdx = True
-sameEnv (SuccIdx idx) (SuccIdx idx') = sameEnv idx idx
+shiftFun :: SubstEnv envInner envOuter envFinal
+          -> Idx envOuter t'
+          -> Idx envFinal t'
+shiftFun (Subst) e = e 
+shiftFun (Keep r) e = shiftIdx Shift $ shiftFun r e
+
+
+shiftOuter :: SubstEnv envInner envOuter envFinal
+            -> ShiftEnv envInner envOuter
+shiftOuter envRel = undefined
+
+substExpr' :: SubstEnv envInner envOuter envFinal
+         -> PreOpenExp OpenAcc envOuter aenv t
+         -> PreOpenExp OpenAcc envFinal aenv t
+substExpr' (Keep r) e = shiftExpEnv $ substExpr' r e
+substExpr  (Subst) e = e  
 
 
 -- Environment shifting
