@@ -17,13 +17,12 @@ map_lowered
 map_lowered f arr
   = generate (shape arr) (\ix -> f (arr!ix))
 
-app_fun :: OpenFun (env,t) aenv t' -> OpenExp envOuter aenv t -> OpenExp envFinal aenv t'
+app_fun :: OpenFun (env,t) aenv t' -> PreOpenExp OpenAcc envOuter aenv t -> PreOpenExp OpenAcc envFinal aenv t'
 app_fun (Body b) e = subst undefined ZeroIdx e b
 
-app_fun' :: OpenFun env aenv (a -> t) -> OpenExp envOuter aenv a -> OpenExp envFinal aenv t
+app_fun' :: OpenFun env aenv (a -> t) -> PreOpenExp OpenAcc envOuter aenv a -> PreOpenExp OpenAcc envFinal aenv t
 app_fun' (Lam f) e = app_fun f e
 
--- (Index undefined arr (Var ZeroIdx)) 
 -- Lower 'map' into 'generate' as a AST rewrite. The array gets duplicated.
 --
 lower_map1 :: OpenAcc aenv arrs -> OpenAcc aenv arrs
@@ -31,13 +30,13 @@ lower_map1 (OpenAcc (Map f arr))
  = OpenAcc $ Generate (Shape arr) (Lam $ Body $ app_fun' f (IndexScalar arr (Var ZeroIdx)) )
 
 
-
 -- Lower 'map' into 'generate' as a AST rewrite. The array is being shared.
 --
 lower_map2 :: OpenAcc aenv arrs -> OpenAcc aenv arrs
 lower_map2 (OpenAcc (Map f arr)) 
-  = error "Implement this!"
-
+ = let arr' = OpenAcc $ Avar ZeroIdx
+       fun =  (Lam $ Body $ app_fun' ( shiftFunAenv f ) (IndexScalar arr' (Var ZeroIdx) ) ) in
+   OpenAcc $ Alet arr $ OpenAcc $ Generate  (Shape $ arr') fun
 
 -- Utilities
 -- ---------
