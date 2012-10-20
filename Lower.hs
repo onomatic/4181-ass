@@ -132,10 +132,21 @@ substVar :: SubstEnv envInner envOuter envFinal
          -> Idx envInner t'
          -> Either (Idx envFinal t') (PreOpenExp OpenAcc envFinal aenv t')
 substVar envRel idx e idxT 
-         | AST.idxToInt idx == AST.idxToInt idxT = Right $ subst envRel idxT (Var idxT) (substExpr' envRel e)
+         | idxEqual idx idxT = Right $ sneaky envRel idx e idxT
          | otherwise = Left $ shiftToOuter envRel idxT
 
+sneaky :: SubstEnv envInner envOuter envFinal
+         -> Idx a t
+         -> PreOpenExp OpenAcc envOuter aenv t
+         -> Idx a t' 
+         -> PreOpenExp OpenAcc envFinal aenv t'
+sneaky envRel ZeroIdx e ZeroIdx =  substExpr' envRel e
+sneaky envRel (SuccIdx i) e (SuccIdx i') = sneaky envRel i e i'          
 
+idxEqual :: Idx envInner t -> Idx envInner t' -> Bool
+idxEqual ZeroIdx ZeroIdx = True
+idxEqual (SuccIdx x) (SuccIdx y) = idxEqual x y
+idxEqual _ _ = False
 
 --subst' :: SubstEnv envInner envOuter envFinal
 --      -> Idx envFinal t'
@@ -147,6 +158,10 @@ substVar envRel idx e idxT
 --         -> Idx (envInner)
 --         -> Idx (envOuter, t') t'
 --fun envRel =  ZeroIdx
+
+
+newIdx :: Idx envInner t -> Idx envInner t' -> Idx envInner t'
+newIdx ZeroIdx ZeroIdx = ZeroIdx
 
 
 shiftToOuter :: SubstEnv envInner envOuter envFinal
