@@ -13,7 +13,12 @@ import Lower
 -- map f (map g arr) = map (f . g) arr [using substitution]
 --
 map_map1 :: OpenAcc aenv arrs -> OpenAcc aenv arrs
-map_map1 = error "Not implemented yet"
+map_map1 (OpenAcc (Map f (OpenAcc (Map g arr) ) ) ) = (OpenAcc (Map (Lam $ Body $ app_fun' f $ get_body g) arr))
+
+
+get_body :: PreFun OpenAcc aenv (a -> t) -> PreOpenExp OpenAcc ((),a) aenv t 
+get_body (Lam (Body b))  = b
+
 
 -- map f (map g arr) = map (f . g) arr [using a let binding]
 --
