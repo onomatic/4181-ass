@@ -131,18 +131,29 @@ substVar :: SubstEnv envInner envOuter envFinal
          -> PreOpenExp OpenAcc envOuter aenv t
          -> Idx envInner t'
          -> Either (Idx envFinal t') (PreOpenExp OpenAcc envFinal aenv t')
-substVar envRel idx e idxT
-         | AST.idxToInt idx == AST.idxToInt idxT = Right $ subst envRel idx e undefined
-         | otherwise = case envRel of 
-                       (Keep r) -> Left $ shiftFun envRel $ (shiftIdx (shiftOuter envRel) idxT )
+substVar envRel idx e idxT 
+         | AST.idxToInt idx == AST.idxToInt idxT = Right $ subst envRel idxT (Var idxT) (substExpr' envRel e)
+         | otherwise = Left $ shiftToOuter envRel idxT
 
 
 
-shiftFun :: SubstEnv envInner envOuter envFinal
-          -> Idx envOuter t'
+--subst' :: SubstEnv envInner envOuter envFinal
+--      -> Idx envFinal t'
+--      -> PreOpenExp OpenAcc envFinal aenv t
+--      -> PreOpenExp OpenAcc envFinal aenv t'
+--subst' envRel (ZeroIdx) (Var (SuccIdx ZeroIdx)) = 
+
+--fun :: SubstEnv envInner envOuter envFinal
+--         -> Idx (envInner)
+--         -> Idx (envOuter, t') t'
+--fun envRel =  ZeroIdx
+
+
+shiftToOuter :: SubstEnv envInner envOuter envFinal
+          -> Idx envInner t'
           -> Idx envFinal t'
-shiftFun (Subst) e = e 
-shiftFun (Keep r) e = shiftIdx Shift $ shiftFun r e
+shiftToOuter (Keep r) ZeroIdx = ZeroIdx
+shiftToOuter (Keep r) (SuccIdx s) =  SuccIdx $ shiftToOuter r s
 
 
 shiftOuter :: SubstEnv envInner envOuter envFinal
@@ -153,7 +164,7 @@ substExpr' :: SubstEnv envInner envOuter envFinal
          -> PreOpenExp OpenAcc envOuter aenv t
          -> PreOpenExp OpenAcc envFinal aenv t
 substExpr' (Keep r) e = shiftExpEnv $ substExpr' r e
-substExpr  (Subst) e = e  
+substExpr' (Subst) e =  e
 
 
 -- Environment shifting
