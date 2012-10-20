@@ -23,9 +23,16 @@ get_body (Lam (Body b))  = b
 
 -- map f (map g arr) = map (f . g) arr [using a let binding]
 --
+-- map f (map g arr) = map (f . g) arr [using a let binding]
+--
 map_map2 :: OpenAcc aenv arrs -> OpenAcc aenv arrs
-map_map2 = error "Not implemented yet"
-
+map_map2 (OpenAcc (Map f (OpenAcc (Map g arr) ) ) ) = 
+        let inner :: PreFun OpenAcc aenv (a -> t) -> PreOpenExp OpenAcc ((),a) aenv t
+	    inner (Lam (Body l)) = l
+	    mid k = (Lam . Body . app_fun' f $ k)
+	in  (OpenAcc (Map (mid (inner g)) arr))
+map_map2 acc = acc
+-- I think this is what its after in regards to the let bind
 -- Apply 'lower_map2' and 'map_map2' to remove all occurences of 'Map' in the argument, while
 -- producing the minimal number of 'Generate' operations without duplicating computations.
 --
