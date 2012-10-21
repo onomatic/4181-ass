@@ -21,17 +21,6 @@ get_body :: PreFun OpenAcc aenv (a -> t) -> OpenExp ((),a) aenv t
 get_body (Lam (Body b))  = b
 
 
-{-shiftFunEnv :: OpenFun env aenv        t 
-              -> OpenFun (env, t') aenv t
-shiftFunEnv (Body e) = Body $ shiftExpEnv e
-shiftFunEnv (Lam e)  = Lam  $ shiftFunEnv e-}
-
-
---shiftFunExpEnv :: PreFun OpenAcc aenv (a -> t) -> PreFun OpenAcc aenv (e -> a) -> OpenFun ((),e) aenv (a -> t)
---shiftFunExpEnv (Lam (Body b)) g = Lam . Body . shiftExpEnv $ b 
-
--- app_fun' ( shiftFunAenv f ) (IndexScalar arr' (Var ZeroIdx)
-
 compose_let :: (Elt e, Elt t, Elt a) => 
                PreFun OpenAcc aenv (a -> t) -> 
                PreFun OpenAcc aenv (e -> a) ->
@@ -48,69 +37,121 @@ map_map2 acc = acc
 --
 -- Hint: There is no need to descent into scalar expressions as all nested array computations
 --       are guaranteed to merely be variables.
-{-
-optuple :: ATuple (PreOpenExp OpenAcc env aenv) t
-        -> ATuple (PreOpenExp OpenAcc env aenv) t
-optuple NilTup = NilTup
-optuple (SnocTup tup e) = SnocTup $ (optuple tup) (optimise e)-}
 
 optimiseAFun ::  OpenAfun aenv t 
               -> OpenAfun aenv t
 optimiseAFun (Alam f) = Alam $ optimiseAFun f
 optimiseAFun (Abody b) = Abody $ optimise b
 
-
 optimise :: OpenAcc aenv arrs -> OpenAcc aenv arrs
-optimise (OpenAcc acc)
+optimise acc = optimise'' . optimise' $ acc
+
+-- I should be able to pass in a function as a parameter but I can't get the types right. This is ugly but works for now.
+optimise'' :: OpenAcc aenv arrs -> OpenAcc aenv arrs
+optimise'' (OpenAcc acc)
   = case acc of
       Alet bndr body
-        -> OpenAcc $ Alet (optimise bndr) (optimise body)
+        -> OpenAcc $ Alet (optimise'' bndr) (optimise'' body)
+      Apply f e      -> OpenAcc $ Apply (optimiseAFun f) (optimise'' e)
       Avar idx       -> OpenAcc $ Avar idx
-     -- Atuple tup     -> Atuple . optuple $ tup
-      Aprj i acc     -> OpenAcc $ Aprj i (optimise acc)
-      Apply f a      -> OpenAcc $ Apply (optimiseAFun f) (optimise . undefined $ acc)
+      Atuple tup     -> OpenAcc $ Atuple tup
+      Aprj i acc     -> OpenAcc $ Aprj i (optimise'' acc)
       Acond c t e
-        -> OpenAcc $ Acond  c (optimise t) (optimise e)
+        -> OpenAcc $ Acond  c (optimise'' t) (optimise'' e)
       Use c          -> OpenAcc $ Use c
       Unit e         -> OpenAcc $ Unit e
-      Reshape sh acc -> OpenAcc $ Reshape sh (optimise acc)
+      Reshape sh acc -> OpenAcc $ Reshape sh (optimise'' acc)
       Generate e f   -> OpenAcc $ Generate e f
       Replicate sidx e acc
         -> OpenAcc $ Replicate sidx e acc
       Index sidx acc e
-        -> OpenAcc $ Index sidx (optimise acc) e
-      Map f acc      -> map_map1 . OpenAcc . Map f $ optimise acc
+        -> OpenAcc $ Index sidx (optimise'' acc) e
+      Map f acc      -> lower_map2 $ OpenAcc $ Map f (optimise'' $ acc)
       ZipWith f acc1 acc2
-                     -> OpenAcc $ ZipWith f (optimise acc1)
-                         (optimise acc2) 
+                     -> OpenAcc $ ZipWith f (optimise'' acc1)
+                         (optimise'' acc2) 
       Fold f e acc   -> OpenAcc $ Fold f e
-                          (optimise acc) 
-      Fold1 f acc    -> OpenAcc $ Fold1 f (optimise acc)
+                          (optimise'' acc) 
+      Fold1 f acc    -> OpenAcc $ Fold1 f (optimise'' acc)
       FoldSeg f e acc segd   
                      -> OpenAcc $ FoldSeg f e
-                          (optimise acc) (optimise segd)
+                          (optimise'' acc) (optimise'' segd)
       Fold1Seg f acc segd   
                      -> OpenAcc $ Fold1Seg f
-                          (optimise acc) (optimise segd)
+                          (optimise'' acc) (optimise'' segd)
       Scanl f e acc  -> OpenAcc $ Scanl f e
-                          (optimise acc)
+                          (optimise'' acc)
       Scanl' f e acc -> OpenAcc $ Scanl' f e
-                          (optimise acc) 
-      Scanl1 f acc   -> OpenAcc $ Scanl1 f (optimise acc)
+                          (optimise'' acc) 
+      Scanl1 f acc   -> OpenAcc $ Scanl1 f (optimise'' acc)
       Scanr f e acc  -> OpenAcc $ Scanr f e
-                          (optimise acc)
+                          (optimise'' acc)
       Scanr' f e acc -> OpenAcc $ Scanr' f e 
-                          (optimise acc)
-      Scanr1 f acc   -> OpenAcc $ Scanr1 f (optimise acc)
+                          (optimise'' acc)
+      Scanr1 f acc   -> OpenAcc $ Scanr1 f (optimise'' acc)
       Permute c dft p acc  
-                     -> OpenAcc $ Permute c (optimise dft)
-                          p (optimise acc)
+                     -> OpenAcc $ Permute c (optimise'' dft)
+                          p (optimise'' acc)
       Backpermute e p acc  
                      -> OpenAcc $ Backpermute e
-                          p (optimise acc) 
+                          p (optimise'' acc) 
       Stencil s bdry acc
-                     -> OpenAcc $ Stencil s bdry (optimise acc)
+                     -> OpenAcc $ Stencil s bdry (optimise'' acc)
       Stencil2 s bdry1 acc1 bdry2 acc2
-                     -> OpenAcc $ Stencil2 s bdry1 (optimise acc1)
-                          bdry2 (optimise acc2)
+                     -> OpenAcc $ Stencil2 s bdry1 (optimise'' acc1)
+                          bdry2 (optimise'' acc2)
+
+optimise' :: OpenAcc aenv arrs -> OpenAcc aenv arrs
+optimise' (OpenAcc acc)
+  = case acc of
+      Alet bndr body
+        -> OpenAcc $ Alet (optimise' bndr) (optimise' body)
+      Apply f e      -> OpenAcc $ Apply (optimiseAFun f) (optimise' e)
+      Avar idx       -> OpenAcc $ Avar idx
+      Atuple tup     -> OpenAcc $ Atuple tup
+      Aprj i acc     -> OpenAcc $ Aprj i (optimise' acc)
+      Acond c t e
+        -> OpenAcc $ Acond  c (optimise' t) (optimise' e)
+      Use c          -> OpenAcc $ Use c
+      Unit e         -> OpenAcc $ Unit e
+      Reshape sh acc -> OpenAcc $ Reshape sh (optimise' acc)
+      Generate e f   -> OpenAcc $ Generate e f
+      Replicate sidx e acc
+        -> OpenAcc $ Replicate sidx e acc
+      Index sidx acc e
+        -> OpenAcc $ Index sidx (optimise' acc) e
+      Map f acc      -> map_map2 $ OpenAcc $ Map f (optimise' $ acc)
+      ZipWith f acc1 acc2
+                     -> OpenAcc $ ZipWith f (optimise' acc1)
+                         (optimise' acc2) 
+      Fold f e acc   -> OpenAcc $ Fold f e
+                          (optimise' acc) 
+      Fold1 f acc    -> OpenAcc $ Fold1 f (optimise' acc)
+      FoldSeg f e acc segd   
+                     -> OpenAcc $ FoldSeg f e
+                          (optimise' acc) (optimise' segd)
+      Fold1Seg f acc segd   
+                     -> OpenAcc $ Fold1Seg f
+                          (optimise' acc) (optimise' segd)
+      Scanl f e acc  -> OpenAcc $ Scanl f e
+                          (optimise' acc)
+      Scanl' f e acc -> OpenAcc $ Scanl' f e
+                          (optimise' acc) 
+      Scanl1 f acc   -> OpenAcc $ Scanl1 f (optimise' acc)
+      Scanr f e acc  -> OpenAcc $ Scanr f e
+                          (optimise' acc)
+      Scanr' f e acc -> OpenAcc $ Scanr' f e 
+                          (optimise' acc)
+      Scanr1 f acc   -> OpenAcc $ Scanr1 f (optimise' acc)
+      Permute c dft p acc  
+                     -> OpenAcc $ Permute c (optimise' dft)
+                          p (optimise' acc)
+      Backpermute e p acc  
+                     -> OpenAcc $ Backpermute e
+                          p (optimise' acc) 
+      Stencil s bdry acc
+                     -> OpenAcc $ Stencil s bdry (optimise' acc)
+      Stencil2 s bdry1 acc1 bdry2 acc2
+                     -> OpenAcc $ Stencil2 s bdry1 (optimise' acc1)
+                          bdry2 (optimise' acc2)
 
