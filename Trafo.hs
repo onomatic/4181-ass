@@ -28,6 +28,8 @@ compose_let :: (Elt e, Elt t, Elt a) =>
 compose_let f g = Lam $ Body $ Let (get_body g) (app_fun' f (Var ZeroIdx) )
 
 --
+-- map f (map g arr) = map (f . g) arr [using a let binding]
+--
 map_map2 :: OpenAcc aenv arrs -> OpenAcc aenv arrs
 map_map2 (OpenAcc (Map f (OpenAcc (Map g arr) ) ) ) = OpenAcc $ Map (compose_let f g) arr
 map_map2 acc = acc
