@@ -24,7 +24,6 @@ app_fun' :: PreFun OpenAcc aenv (a -> t) -> PreOpenExp OpenAcc envFinal aenv a -
 app_fun' (Lam f) e = app_fun f e
 
 --Lower 'map' into 'generate' as a AST rewrite. The array gets duplicated.
---(IndexScalar arr (Var ZeroIdx)
 lower_map1 :: OpenAcc aenv arrs -> OpenAcc aenv arrs
 lower_map1 (OpenAcc (Map f arr)) 
  = OpenAcc $ Generate (Shape arr) (Lam $ Body $ app_fun' f (IndexScalar arr (Var ZeroIdx) ) )
